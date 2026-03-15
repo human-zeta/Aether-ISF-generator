@@ -1,0 +1,8 @@
+{
+  "name": "Aether ISF Generator",
+  "description": "An infinite AI-powered ISF shader generator for VDMX6. Create, preview, and export generative visuals.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

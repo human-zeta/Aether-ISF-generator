@@ -2,14 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Wand2, Download, Upload, RefreshCw, Copy, Check, 
   Mic, MicOff, Video, VideoOff, ChevronLeft, ChevronRight,
-  Monitor, Maximize, Image as ImageIcon, Sparkles, Layers, Box, Zap, X, Dice5, Wrench
+  Monitor, Maximize, Image as ImageIcon, Sparkles, Layers, Box, Zap, X, Dice5, Wrench, Save, Library
 } from 'lucide-react';
 import { generateShader, repairShader } from './services/gemini';
 import { parseISF } from './utils/isf';
 import { DEFAULT_SHADER } from './constants';
 import ShaderCanvas from './components/ShaderCanvas';
 import Controls from './components/Controls';
-import { ParsedShader, UniformValues, TextureSettings } from './types';
+import Gallery from './components/Gallery';
+import { ParsedShader, UniformValues, TextureSettings, SavedShader } from './types';
 import { useMedia } from './hooks/useMedia';
 
 const STYLES = [
@@ -89,6 +90,13 @@ const App: React.FC = () => {
   const [compileError, setCompileError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pixelDensity, setPixelDensity] = useState<number>(1.0);
+  
+  // Gallery State
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [savedShaders, setSavedShaders] = useState<SavedShader[]>(() => {
+    const saved = localStorage.getItem('aether_saved_shaders');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Refs
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -226,6 +234,35 @@ const App: React.FC = () => {
       }
   };
 
+  const handleSaveShader = () => {
+    let thumbnail = undefined;
+    if (canvasRef.current) {
+        try {
+            thumbnail = canvasRef.current.toDataURL('image/jpeg', 0.5);
+        } catch (e) {
+            console.warn("Could not capture thumbnail", e);
+        }
+    }
+
+    const newShader: SavedShader = {
+        id: Date.now().toString(),
+        name: prompt || 'Untitled Shader',
+        code: code,
+        timestamp: Date.now(),
+        thumbnail
+    };
+
+    const updatedShaders = [newShader, ...savedShaders];
+    setSavedShaders(updatedShaders);
+    localStorage.setItem('aether_saved_shaders', JSON.stringify(updatedShaders));
+  };
+
+  const handleDeleteShader = (id: string) => {
+      const updatedShaders = savedShaders.filter(s => s.id !== id);
+      setSavedShaders(updatedShaders);
+      localStorage.setItem('aether_saved_shaders', JSON.stringify(updatedShaders));
+  };
+
   return (
     <div className="relative h-screen w-screen bg-black text-gray-200 font-sans overflow-hidden">
       
@@ -237,6 +274,7 @@ const App: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
                 <h1 className="text-sm font-bold tracking-widest text-white uppercase">Aether <span className="text-cyan-500">ISF</span></h1>
                 <div className="flex gap-1">
+                     <button onClick={() => setIsGalleryOpen(true)} className="p-1.5 hover:bg-white/5 rounded text-gray-500 hover:text-cyan-400 transition-colors mr-2" title="Saved Shaders"><Library size={14}/></button>
                      <button onClick={handleUndo} disabled={historyIndex === 0} className="p-1.5 hover:bg-white/5 rounded disabled:opacity-30 text-gray-500 hover:text-white transition-colors"><ChevronLeft size={14}/></button>
                      <button onClick={handleRedo} disabled={historyIndex === history.length - 1} className="p-1.5 hover:bg-white/5 rounded disabled:opacity-30 text-gray-500 hover:text-white transition-colors"><ChevronRight size={14}/></button>
                 </div>
@@ -343,7 +381,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Functional Footer */}
-        <div className="p-3 bg-transparent border-t border-white/10 grid grid-cols-4 gap-2">
+        <div className="p-3 bg-transparent border-t border-white/10 grid grid-cols-5 gap-2">
              <button onClick={() => shaderInputRef.current?.click()} className="flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded text-xs font-bold transition-all border border-white/5" title="Import Shader">
                 <Upload size={14} /> <span className="hidden sm:inline">Import</span>
              </button>
@@ -351,6 +389,10 @@ const App: React.FC = () => {
 
              <button onClick={handleDownload} className="flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded text-xs font-bold transition-all border border-white/5" title="Export Shader">
                 <Download size={14} /> <span className="hidden sm:inline">Export</span>
+             </button>
+
+             <button onClick={handleSaveShader} className="flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded text-xs font-bold transition-all border border-white/5" title="Save to Gallery">
+                <Save size={14} /> <span className="hidden sm:inline">Save</span>
              </button>
 
              <button onClick={handleRepair} disabled={isGenerating} className="flex items-center justify-center gap-2 py-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white rounded text-xs font-bold transition-all border border-white/5 disabled:opacity-50" title="Auto-Repair Shader">
@@ -415,6 +457,17 @@ const App: React.FC = () => {
              </div>
          )}
       </div>
+
+      <Gallery 
+         isOpen={isGalleryOpen} 
+         onClose={() => setIsGalleryOpen(false)} 
+         savedShaders={savedShaders} 
+         onLoad={(shader) => {
+             setPrompt(shader.name);
+             updateCode(shader.code);
+         }} 
+         onDelete={handleDeleteShader} 
+      />
     </div>
   );
 };

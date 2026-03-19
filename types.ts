@@ -46,3 +46,11 @@ export interface TextureSettings {
         wrap: TextureWrap;
     };
 }
+
+export interface SavedShader {
+  id: string;
+  name: string;
+  code: string;
+  timestamp: number;
+  thumbnail?: string;
+}
